@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CMAK Shirts – St. Veronica Syokimau</title>
+  <meta name="theme-color" content="#7a1f2b">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="top">
+    <img src="./icons/icon-192.png" alt="" class="logo">
+    <div>
+      <div class="brand">CMAK St. Veronica, Syokimau</div>
+      <div class="brand-sub">Commissioning 2026 – Shirt Size</div>
+    </div>
+    <button id="installBtn" class="install" onclick="promptInstall()">Install</button>
+  </header>
+
+  <main class="wrap">
+    <div id="offline" class="banner" hidden>You are offline. You can still fill the form; it will be sent when you reconnect.</div>
+
+    <section class="card">
+      <p class="sub">Pick your name, check your classes attended, choose your size and confirm with the phone number you registered with. Closes <span id="closing">…</span>.</p>
+
+      <label for="name">Your name</label>
+      <select id="name" onchange="showAttendance()"><option value="">Loading names…</option></select>
+      <div class="hint">Only candidates who have attended at least one class appear here.</div>
+
+      <div id="att" class="att">
+        <div class="row"><span>SCC</span><span id="aScc"></span></div>
+        <div class="row"><span>Category</span><span id="aCat"></span></div>
+        <div class="classes" id="aClasses"></div>
+        <div class="row"><span>Classes attended</span><span id="aCount"></span></div>
+        <div class="row"><span>Status</span><span id="aStatus" class="st"></span></div>
+        <div class="recorded" id="aRecorded"></div>
+      </div>
+
+      <label for="size">Shirt size (chest in inches)</label>
+      <select id="size"><option value="">Select size</option></select>
+
+      <label for="notes">Notes for the tailor (optional)</label>
+      <textarea id="notes" rows="2" maxlength="200" placeholder="e.g. heavily built, big arms, big belly, prefer loose fit"></textarea>
+      <div class="hint">Shared with the tailor together with your size.</div>
+
+      <label for="phone">Phone number registered with CMAK</label>
+      <input id="phone" type="tel" inputmode="tel" placeholder="0722 123 456" autocomplete="tel">
+
+      <button id="btn" class="primary" onclick="submitSize()">Submit</button>
+      <div id="msg" class="msg"></div>
+    </section>
+
+    <p class="foot">Catholic Men Association of Kenya · St. Veronica Parish</p>
+  </main>
+
+  <script src="./app.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    let people = {}, CLASS_LABELS = ['C1', 'C2', 'C3', 'C4'];
+
+    function show(kind, text) { const m = $('msg'); m.className = 'msg ' + kind; m.textContent = text; }
+    function setOnline() { $('offline').hidden = navigator.onLine; }
+    window.addEventListener('online', () => { setOnline(); flushQueue(r => show(r.ok ? 'ok' : 'err', r.message)); loadNames(true); });
+    window.addEventListener('offline', setOnline);
+
+    async function loadNames(keepSelected) {
+      const prev = keepSelected ? $('name').value : '';
+      try {
+        const r = await api({ action: 'eligible' });
+        if (!r.ok) throw new Error(r.message);
+        $('closing').textContent = r.closing;
+        CLASS_LABELS = r.classes;
+        const sz = $('size'); sz.innerHTML = '<option value="">Select size</option>';
+        r.sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sz.appendChild(o); });
+        people = {};
+        const sel = $('name'); sel.innerHTML = '<option value="">Select your name</option>';
+        r.list.forEach(c => {
+          people[c.name] = c;
+          const o = document.createElement('option');
+          o.value = c.name; o.textContent = c.name + ' – ' + c.scc + (c.size ? ' ✓' : '');
+          sel.appendChild(o);
+        });
+        if (prev && people[prev]) sel.value = prev;
+        showAttendance();
+        try { localStorage.setItem('cmak_eligible_cache', JSON.stringify(r)); } catch (e) {}
+      } catch (e) {
+        // offline: use cached names so the form still works
+        let cached = null; try { cached = JSON.parse(localStorage.getItem('cmak_eligible_cache') || 'null'); } catch (x) {}
+        if (cached) { const sel = $('name'); sel.innerHTML = ''; people = {};
+          $('closing').textContent = cached.closing;
+          const sz = $('size'); sz.innerHTML = '<option value="">Select size</option>';
+          cached.sizes.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sz.appendChild(o); });
+          sel.innerHTML = '<option value="">Select your name</option>';
+          cached.list.forEach(c => { people[c.name] = c; const o = document.createElement('option'); o.value = c.name; o.textContent = c.name + ' – ' + c.scc; sel.appendChild(o); });
+          show('err', 'Offline – showing the last saved list. Your submission will be sent when you reconnect.');
+        } else show('err', 'Could not load names: ' + e.message);
+      }
+    }
+
+    function showAttendance() {
+      const c = people[$('name').value]; const box = $('att');
+      if (!c) { box.className = 'att'; return; }
+      $('aScc').textContent = c.scc; $('aCat').textContent = c.category;
+      $('aClasses').innerHTML = c.classes.map((v, i) => {
+        const k = v === 'P' ? 'P' : v === 'A' ? 'A' : 'N';
+        const label = v === 'P' ? 'Present' : v === 'A' ? 'Absent' : 'Pending';
+        return '<div class="cls ' + k + '">' + (k === 'N' ? '–' : v) + '<small>' + CLASS_LABELS[i] + ' ' + label + '</small></div>';
+      }).join('');
+      const held = c.classes.filter(v => v === 'P' || v === 'A').length;
+      $('aCount').textContent = c.attended + ' of ' + held + ' held';
+      const st = $('aStatus'); st.textContent = c.status; st.className = 'st ' + c.status.split(' ')[0];
+      $('aRecorded').textContent = c.size ? 'Size already recorded: ' + c.size + '. Submitting again will replace it.' : '';
+      if (c.size) $('size').value = c.size;
+      $('notes').value = c.notes || '';
+      box.className = 'att show';
+    }
+
+    async function submitSize() {
+      const p = { name: $('name').value, size: $('size').value, phone: $('phone').value.trim(), notes: $('notes').value.trim() };
+      if (!p.name) return show('err', 'Pick your name.');
+      if (!p.size) return show('err', 'Pick your shirt size.');
+      if (p.phone.replace(/\D/g, '').length < 9) return show('err', 'Enter your phone number.');
+      $('btn').disabled = true; show('ok', 'Saving…');
+      if (!navigator.onLine) { queueSubmission(p); $('btn').disabled = false; return show('ok', 'Saved on your phone. It will be sent automatically when you are back online.'); }
+      try {
+        const r = await api(Object.assign({ action: 'submit' }, p));
+        show(r.ok ? 'ok' : 'err', r.message);
+        if (r.ok) loadNames(true);
+      } catch (e) {
+        queueSubmission(p);
+        show('ok', 'Network problem. Saved on your phone; it will be sent automatically when you are back online.');
+      }
+      $('btn').disabled = false;
+    }
+
+    setOnline();
+    flushQueue(r => show(r.ok ? 'ok' : 'err', 'Earlier submission: ' + r.message));
+    loadNames(false);
+  </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CMAK Shirts – Officers' Report</title>
+  <meta name="theme-color" content="#7a1f2b">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="top">
+    <img src="./icons/icon-192.png" alt="" class="logo">
+    <div>
+      <div class="brand">CMAK St. Veronica, Syokimau</div>
+      <div class="brand-sub">Commissioning 2026 – Shirt Report</div>
+    </div>
+    <a class="install" href="./index.html">Member form</a>
+  </header>
+
+  <main class="wrap">
+    <section class="card" id="pinCard">
+      <label for="pin">Officers' PIN</label>
+      <input id="pin" type="password" inputmode="numeric" placeholder="Enter PIN">
+      <button class="primary" onclick="load()">Open report</button>
+      <div id="pinMsg" class="msg"></div>
+    </section>
+
+    <div id="rep" hidden>
+      <section class="card">
+        <p class="sub" id="asat"></p>
+        <div class="kpi"><div><b id="kE"></b>Eligible</div><div><b id="kS"></b>Submitted</div><div><b id="kP"></b>Pending</div></div>
+        <div class="btns">
+          <a class="wa" id="shareUpdate" target="_blank">Share progress update</a>
+          <a class="wa" id="sharePending" target="_blank">Share pending list</a>
+          <a class="wa" id="shareLink" target="_blank">Share app link</a>
+          <button class="copy" onclick="copyText(msgUpdate())">Copy update</button>
+          <button class="copy" onclick="load()">Refresh</button>
+        </div>
+      </section>
+
+      <section class="card"><h2>Pending by SCC</h2>
+        <div class="btns"><select id="sccSel"></select><a class="wa" id="shareScc" target="_blank">Share this SCC's pending list</a></div>
+        <textarea id="preview" readonly></textarea>
+      </section>
+
+      <section class="card"><h2>Order quantities by size</h2>
+        <table id="tSize"><tr><th>Size</th><th class="n">Qty</th></tr></table>
+        <div class="btns">
+          <a class="wa" id="shareSizes" target="_blank">Share size summary</a>
+          <a class="wa" id="shareTailor" target="_blank">Share tailor list (sizes + notes)</a>
+          <button class="copy" onclick="copyText(msgTailor())">Copy tailor list</button>
+        </div>
+      </section>
+
+      <section class="card"><h2>Pending (<span id="nP"></span>)</h2>
+        <p class="sub">Remind opens a WhatsApp chat with that member, message ready.</p>
+        <table id="tPend"><tr><th>#</th><th>Name</th><th>SCC</th><th class="n">Att.</th><th></th></tr></table>
+      </section>
+
+      <section class="card"><h2>Submitted (<span id="nS"></span>)</h2>
+        <table id="tSub"><tr><th>Name</th><th>SCC</th><th>Size</th><th>Notes for tailor</th></tr></table>
+      </section>
+    </div>
+  </main>
+
+  <script src="./app.js"></script>
+  <script>
+    const APP_LINK = location.href.replace(/report\.html.*$/, '');
+    let D = null;
+    const $ = id => document.getElementById(id);
+    const wa = t => 'https://wa.me/?text=' + encodeURIComponent(t);
+    const waTo = (phone, t) => 'https://wa.me/' + phone + '?text=' + encodeURIComponent(t);
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const line = (c, i) => (i + 1) + '. ' + c.name + ' – ' + c.scc;
+
+    function msgUpdate() {
+      const sizes = Object.keys(D.bySize).filter(s => D.bySize[s]).map(s => '  ' + s + ': ' + D.bySize[s]).join('\n');
+      return '*CMAK 2026 COMMISSIONING SHIRTS – UPDATE*\n' + D.asAt + '\n\nEligible: ' + D.eligible + '\nSubmitted: ' + D.submitted + '\nPending: ' + D.pending + '\n\n' +
+        (sizes ? 'Sizes so far:\n' + sizes + '\n\n' : '') + 'Pending members please submit before ' + D.closing + ':\n' + APP_LINK;
+    }
+    function msgPending(list, title) {
+      return '*' + title + ' (' + list.length + ')*\n' + list.map(line).join('\n') + '\n\nSubmit your shirt size before ' + D.closing + ':\n' + APP_LINK;
+    }
+    function msgSizes() {
+      return '*CMAK 2026 SHIRT ORDER – SIZES*\n' + D.asAt + '\n\n' + Object.keys(D.bySize).map(s => s + ': ' + D.bySize[s]).join('\n') +
+        '\n\nTotal submitted: ' + D.submitted + ' of ' + D.eligible + ' (' + D.pending + ' pending)';
+    }
+    function msgTailor() {
+      const g = {}; D.submittedList.forEach(c => { (g[c.size] = g[c.size] || []).push(c); });
+      let out = '*CMAK 2026 SHIRTS – TAILOR LIST*\n' + D.asAt + '\nTotal: ' + D.submitted + '\n';
+      Object.keys(D.bySize).forEach(s => { const l = g[s] || []; out += '\n*' + s + ' – ' + l.length + '*\n'; l.forEach((c, i) => { out += (i + 1) + '. ' + c.name + (c.notes ? ' (' + c.notes + ')' : '') + '\n'; }); });
+      return out;
+    }
+    function msgLink() {
+      return '*CMAK 2026 Commissioning – Shirt Size*\nAll commissioning and reception candidates who have attended at least one class: please open the CMAK Shirts app, select your name and shirt size before ' + D.closing + '.\n' + APP_LINK + '\nYou will need the phone number you registered with. Tip: open it in Chrome and tap Install to keep it on your home screen.';
+    }
+    function msgRemind(c) {
+      return 'Hello ' + c.name.split(' ')[0] + ', this is CMAK St. Veronica. Kindly submit your commissioning shirt size before ' + D.closing + ' here: ' + APP_LINK + '  Thank you.';
+    }
+    function copyText(t) { navigator.clipboard.writeText(t).then(() => alert('Copied')); }
+
+    async function load() {
+      const pin = $('pin').value.trim() || sessionStorage.getItem('cmak_pin') || '';
+      if (!pin) return;
+      $('pinMsg').className = 'msg ok'; $('pinMsg').textContent = 'Loading…';
+      try {
+        const r = await api({ action: 'report', pin: pin });
+        if (!r.ok) { $('pinMsg').className = 'msg err'; $('pinMsg').textContent = r.message; return; }
+        sessionStorage.setItem('cmak_pin', pin);
+        D = r; render();
+        $('pinCard').hidden = true; $('rep').hidden = false;
+      } catch (e) { $('pinMsg').className = 'msg err'; $('pinMsg').textContent = e.message; }
+    }
+
+    function render() {
+      $('asat').textContent = 'As at ' + D.asAt + '. Eligible = attended at least one class.';
+      $('kE').textContent = D.eligible; $('kS').textContent = D.submitted; $('kP').textContent = D.pending;
+      $('nP').textContent = D.pending; $('nS').textContent = D.submitted;
+      $('shareUpdate').href = wa(msgUpdate());
+      $('sharePending').href = wa(msgPending(D.pendingList, 'CMAK 2026 SHIRT SIZES – PENDING'));
+      $('shareSizes').href = wa(msgSizes());
+      $('shareTailor').href = wa(msgTailor());
+      $('shareLink').href = wa(msgLink());
+
+      const sccs = [...new Set(D.pendingList.map(c => c.scc))].sort();
+      const sel = $('sccSel'); sel.innerHTML = '';
+      sccs.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s + ' (' + D.pendingList.filter(c => c.scc === s).length + ')'; sel.appendChild(o); });
+      const updScc = () => { const s = sel.value; const m = msgPending(D.pendingList.filter(c => c.scc === s), 'CMAK 2026 SHIRT SIZES – PENDING, ' + s.toUpperCase()); $('shareScc').href = wa(m); $('preview').value = m; };
+      sel.onchange = updScc; if (sccs.length) updScc();
+
+      const tS = $('tSize'); tS.innerHTML = '<tr><th>Size</th><th class="n">Qty</th></tr>';
+      Object.keys(D.bySize).forEach(s => tS.insertAdjacentHTML('beforeend', '<tr><td>' + esc(s) + '</td><td class="n">' + D.bySize[s] + '</td></tr>'));
+      const tP = $('tPend'); tP.innerHTML = '<tr><th>#</th><th>Name</th><th>SCC</th><th class="n">Att.</th><th></th></tr>';
+      D.pendingList.forEach((c, i) => tP.insertAdjacentHTML('beforeend', '<tr><td class="n">' + (i + 1) + '</td><td>' + esc(c.name) + '</td><td>' + esc(c.scc) + '</td><td class="n">' + c.attended + '</td><td><a class="wa small" target="_blank" href="' + waTo(c.phone, msgRemind(c)) + '">Remind</a></td></tr>'));
+      const tU = $('tSub'); tU.innerHTML = '<tr><th>Name</th><th>SCC</th><th>Size</th><th>Notes for tailor</th></tr>';
+      D.submittedList.forEach(c => tU.insertAdjacentHTML('beforeend', '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.scc) + '</td><td>' + esc(c.size) + '</td><td>' + esc(c.notes || '') + '</td></tr>'));
+    }
+
+    if (sessionStorage.getItem('cmak_pin')) load();
+  </script>
+</body>
+</html>
