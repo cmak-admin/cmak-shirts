@@ -1,5 +1,5 @@
 /* CMAK Shirts PWA – shared client. Edit API_URL only. */
-const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; // ends with /exec
+const API_URL = 'https://script.google.com/macros/s/AKfycbzmmFOJvoK2YtkR1Z7vQh2KVg5GJ6bADAwG5RqCgjirjbu14ZB_f8p02FChhfXFx_ZH/exec'; // ends with /exec
 
 const QUEUE_KEY = 'cmak_shirt_queue';
 
